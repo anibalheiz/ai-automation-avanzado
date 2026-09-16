@@ -1,0 +1,230 @@
+{
+  "name": "Checkpoint 1 - Agente Postventa",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        48,
+        0
+      ],
+      "id": "1151e245-8037-4f2a-a91b-60c81911aad9",
+      "name": "When chat message received",
+      "webhookId": "4981f732-3d6c-411f-9b77-1c168cc8547a"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Consulta los datos registrados de un pedido en el sistema de la tienda a partir de su número.\n\nDevuelve: número de pedido, correo del cliente, producto, fecha de compra, estado del envío, fecha de entrega, transportista y días de plazo de\ndevolución aplicables a ese pedido.\n\nUsa esta herramienta siempre que el cliente mencione un número de pedido y consulte por: dónde está su compra, si ya fue entregada, cuándo llega, qué transportista la lleva, si está demorada, o si todavía está dentro del plazo para cambiar o devolver el producto.\n\nTambién debes usarla antes de responder cualquier pregunta sobre plazos de devolución, porque el plazo varía según el pedido y solo el sistema tiene el valor correcto.\n\nNo la uses si el cliente no ha proporcionado un número de pedido. En ese caso, pídeselo primero. Nunca consultes con un número inventado o supuesto.",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1TCwA4Eywguic-eNTirvSoSrgbvMfZzKg8Ep-H21CPqg/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TCwA4Eywguic-eNTirvSoSrgbvMfZzKg8Ep-H21CPqg/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "numero_pedido",
+              "lookupValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values0_Value', ``, 'string') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        544,
+        224
+      ],
+      "id": "46596fb5-cc81-4df8-b34e-cc53e4cf5330",
+      "name": "consultar_pedido",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "IwagRaKrHqEBpNAw",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "aheiz.sanchez@gmail.com",
+        "subject": "=[Agente Postventa] Tarea completada - Ejecución {{ $execution.id }}",
+        "emailType": "text",
+        "message": "=REPORTE AUTOMÁTICO DE SUPERVISIÓN HUMANA \nAgente: Asistente de Postventa \nWorkflow: {{ $workflow.name }} \nID de ejecución: {{ $execution.id }} \nFecha y hora: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}  \n\n--- CONSULTA DEL CLIENTE --- \n{{ $('When chat message received').item.json.chatInput }}  \n\n--- RESPUESTA DEL AGENTE --- {{ $json.output }}  \n\n--- ESTADO --- \nTarea completada. \nAuditoría completa del ciclo de razonamiento disponible en el panel de ejecuciones de n8n, ejecución {{ $execution.id }}.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        0
+      ],
+      "id": "207d1d4c-c67a-4356-bb8b-e9f35c812757",
+      "name": "log_observabilidad",
+      "webhookId": "4c2d56b4-c820-4731-addd-13834869f1ee",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "67Y3d8xoDsq3gA6j",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        208
+      ],
+      "id": "0c8f71e2-ca63-4c38-af7b-935f3e6b866e",
+      "name": "modelo_gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gNlmXjyIqt7GVGRk",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=## ROL Y ÁMBITO\nEres el Asistente de Postventa de una tienda de comercio electrónico.\nAtiendes consultas de clientes sobre estado de pedidos, plazos de entrega\ny condiciones de cambio o devolución.\n\nNo estás autorizado a: autorizar reembolsos, otorgar descuentos o cupones,\nmodificar o cancelar pedidos, comprometer fechas de entrega distintas a las\nregistradas en el sistema, ni responder consultas ajenas al ámbito de postventa.\n\n## CONTEXTO\nLa fecha de hoy es {{ $now.format('yyyy-MM-dd') }}.\n\n## OBJETIVO OPERATIVO\nResolver la consulta del cliente en una sola conversación usando\nexclusivamente información verificada del sistema, o derivarla a un asesor\nhumano dejando el caso documentado.\n\n## REGLAS DE USO DE HERRAMIENTAS\nDispones de la herramienta consultar_pedido, que devuelve los datos\nregistrados de un pedido a partir de su número.\n\n- Si el cliente menciona un número de pedido, consulta la herramienta antes\n  de responder. No respondas de memoria.\n- Si no menciona el número, pídeselo. Nunca consultes con un número inventado\n  ni deducido.\n- Nunca afirmes un estado, una fecha ni un transportista que no provenga de\n  la herramienta.\n- Si la herramienta no devuelve resultados, informa que el pedido no figura\n  y pide verificar el número. No supongas el motivo.\n- Consulta una sola vez por cada número de pedido.\n\n## POLÍTICA DE DEVOLUCIONES\n- El plazo de cada pedido está en el campo dias_devolucion. Léelo siempre.\n  No asumas un plazo estándar.\n- El plazo se cuenta desde fecha_entrega. Si fecha_entrega está vacía, el\n  pedido no fue entregado y el plazo aún no comienza.\n- Un pedido en estado Cancelado no admite devolución.\n- Puedes informar si el pedido está dentro o fuera de plazo, pero no puedes\n  iniciar, aprobar ni gestionar la devolución.\n\n## PROTOCOLO DE ESCALAMIENTO\nDetén tu razonamiento y responde \"Transfiero su caso a un asesor humano,\nquien le contactará a la brevedad\" cuando el cliente:\n- solicite un reembolso, una compensación o un descuento\n- reporte un producto defectuoso o dañado\n- esté fuera de plazo de devolución e insista en devolver\n- mencione acciones legales o adopte un tono agresivo\n- plantee un tema fuera del ámbito de postventa\n\n## FORMATO DE RESPUESTA\nEspañol neutro, trato de usted, máximo 120 palabras. Sin emojis.\nSin lenguaje inclusivo con terminaciones en \"e\", \"x\" o \"@\".\nUsa viñetas solo para enumerar datos del pedido.",
+          "maxIterations": 6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        400,
+        0
+      ],
+      "id": "b4c44e73-87c3-4e46-bc59-2937d8133d88",
+      "name": "agente_postventa"
+    },
+    {
+      "parameters": {
+        "content": "Entrada: consulta desestructurada del cliente",
+        "height": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -16,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "37c10956-5de1-42cb-91a1-d594fc78a362",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "Núcleo ReAct · Tools Agent · guardrail 6 iteraciones · política de devoluciones en System Message",
+        "height": 496,
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "aa806060-04a4-4ba1-a44a-28f944824793",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Observabilidad: reporte de supervisión humana por cada ejecución",
+        "height": 496,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        832,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "98688ec2-b3ec-458a-8c33-826992551b78",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "agente_postventa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_pedido": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente_postventa",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "modelo_gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "agente_postventa",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agente_postventa": {
+      "main": [
+        [
+          {
+            "node": "log_observabilidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d29e9ad0-ff16-4641-a4b2-c76107815b7d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "dcfvExw77TGU4Vk3",
+  "tags": [
+    {
+      "updatedAt": "2026-06-04T20:24:06.655Z",
+      "createdAt": "2026-06-04T20:24:06.655Z",
+      "id": "jJhBl9tZlTYQFtVZ",
+      "name": "AI Automation"
+    }
+  ]
+}
