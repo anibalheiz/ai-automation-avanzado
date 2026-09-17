@@ -1,0 +1,233 @@
+{
+  "name": "worker_escalamiento_humano",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "motivo_escalamiento"
+            },
+            {
+              "name": "resumen_consulta"
+            },
+            {
+              "name": "numero_pedido"
+            },
+            {
+              "name": "email_cliente"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "56874a92-4cc5-4bd6-940f-9e15538845a4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a303180a-a0a6-4efe-8a3a-9ff03cf9ec7a",
+              "name": "ticket_id",
+              "value": "={{ \"TK-\" + $now.format('yyyyMMdd') + \"-\" + $execution.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "3d2ca855-e82d-43e0-92a4-87dc7913f499",
+      "name": "generar_ticket"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        416,
+        192
+      ],
+      "id": "91fd679e-399b-4ca9-af88-f424f6237f7a",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gNlmXjyIqt7GVGRk",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Redacta un aviso interno para el equipo de atencion al cliente.\n\nDatos del caso:\n- Ticket: {{ $json.ticket_id }}\n- Motivo de escalamiento: {{ $json.motivo_escalamiento }}\n- Numero de pedido: {{ $json.numero_pedido }}\n- Correo del cliente: {{ $json.email_cliente }}\n- Consulta original: {{ $json.resumen_consulta }}\n\nInstrucciones:\n- Maximo 80 palabras.\n- Dirigido al equipo interno, no al cliente.\n- Indica que accion concreta debe tomar el asesor.\n- Espanol neutro, tono profesional, sin emojis.\n- Sin lenguaje inclusivo con terminaciones en \"e\", \"x\" o \"@\".\n- Devuelve unicamente el texto del aviso, sin encabezados ni saludos.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        416,
+        0
+      ],
+      "id": "aba84e87-2e33-4e00-af69-c3be48d143c1",
+      "name": "redactar_aviso",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "aheiz.sanchez@gmail.com",
+        "subject": "=[ESCALAMIENTO] {{ $('generar_ticket').item.json.ticket_id }} - Pedido {{ $('generar_ticket').item.json.numero_pedido }}",
+        "emailType": "text",
+        "message": "={{ $json.text }}  \n--- \nTicket: {{ $('generar_ticket').item.json.ticket_id }} \nPedido: {{ $('generar_ticket').item.json.numero_pedido }} \nCliente: {{ $('generar_ticket').item.json.email_cliente }} \nMotivo: {{ $('generar_ticket').item.json.motivo_escalamiento }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        -96
+      ],
+      "id": "ed5c0472-8646-48c0-a223-7676168d197e",
+      "name": "enviar_aviso",
+      "webhookId": "847ab685-90fc-4e5d-b6f7-ac56c29a8753",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "67Y3d8xoDsq3gA6j",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"success\",\n  \"worker\": \"escalamiento_humano\",\n  \"motivo\": null,\n  \"data\": {\n    \"ticket_id\": \"{{ $('generar_ticket').item.json.ticket_id }}\",\n    \"canal\": \"email\",\n    \"enviado_a\": \"equipo_atencion\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        976,
+        -192
+      ],
+      "id": "ca4d61a3-d7cd-400a-88eb-d9e993ee9509",
+      "name": "salida_exito"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"error\",\n  \"worker\": \"escalamiento_humano\",\n  \"motivo\": \"fallo_envio\",\n  \"data\": null\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        160
+      ],
+      "id": "75180a35-69cf-4e2f-9ff2-1a23895edd52",
+      "name": "salida_error_envio"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "generar_ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generar_ticket": {
+      "main": [
+        [
+          {
+            "node": "redactar_aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "redactar_aviso",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "redactar_aviso": {
+      "main": [
+        [
+          {
+            "node": "enviar_aviso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_error_envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviar_aviso": {
+      "main": [
+        [
+          {
+            "node": "salida_exito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_error_envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4490cb86-39b1-4a8f-9d7e-3abd6f4afa13",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "T5otebCYFEBITbfc",
+  "tags": []
+}
