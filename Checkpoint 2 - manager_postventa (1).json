@@ -1,0 +1,1066 @@
+{
+  "name": "Checkpoint 2 - manager_postventa",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        48,
+        320
+      ],
+      "id": "a442fcda-1ea8-4fcc-9100-4fba0e48263a",
+      "name": "When chat message received",
+      "webhookId": "4981f732-3d6c-411f-9b77-1c168cc8547a"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "Eres un clasificador de intenciones de un servicio de postventa\nde comercio electronico.\n\nAnaliza el mensaje del cliente y devuelve UNICAMENTE un objeto JSON,\nsin texto adicional, sin explicaciones y sin bloques de codigo.\n\nFormato exacto de salida:\n{\"intencion\":\"CATEGORIA\",\"numero_pedido\":\"NUMERO_O_VACIO\"}\n\nCATEGORIAS PERMITIDAS (usa exactamente una):\n- ESTADO_PEDIDO: pregunta donde esta su compra, si llego, cuando llega,\n  quien la transporta, o si esta demorada.\n- DEVOLUCION: quiere devolver, cambiar o retornar un producto, o\n  pregunta si esta a tiempo de hacerlo.\n- ESCALAMIENTO: pide reembolso, compensacion o descuento; reporta\n  producto defectuoso o danado; menciona acciones legales; adopta\n  tono agresivo; o insiste tras una negativa.\n- FUERA_DE_ALCANCE: cualquier tema ajeno a la postventa de un pedido.\n\nREGLAS:\n- Si el mensaje contiene un numero de pedido, extraelo en numero_pedido.\n  Si no lo contiene, deja numero_pedido como cadena vacia.\n- No inventes numeros de pedido.\n- Si dudas entre DEVOLUCION y ESCALAMIENTO, elige ESCALAMIENTO.\n- Si el mensaje no encaja con claridad en ninguna categoria, usa\n  FUERA_DE_ALCANCE.\n- Responde solo el JSON. Nada mas.",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        272,
+        320
+      ],
+      "id": "75486080-531d-4154-a832-26c520d694ba",
+      "name": "agente_triaje",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        272,
+        576
+      ],
+      "id": "8b093b76-6f37-44dd-9375-2535fe48021e",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gNlmXjyIqt7GVGRk",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output || $input.first().json.text || '';\nconst limpio = raw.replace(/```json/gi, '').replace(/```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(limpio);\n} catch (e) {\n  parsed = { intencion: 'FUERA_DE_ALCANCE', numero_pedido: '' };\n}\n\nconst permitidas = ['ESTADO_PEDIDO', 'DEVOLUCION', 'ESCALAMIENTO', 'FUERA_DE_ALCANCE'];\nconst intencion = permitidas.includes(parsed.intencion)\n  ? parsed.intencion\n  : 'FUERA_DE_ALCANCE';\n\nreturn [{\n  json: {\n    intencion: intencion,\n    numero_pedido: String(parsed.numero_pedido || ''),\n    consulta_original: $('When chat message received').first().json.chatInput\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        304
+      ],
+      "id": "a6db3668-e0af-46f8-b1ec-9610b09b094c",
+      "name": "parsear_intencion"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "62daa098-bd55-4e60-8abd-39de6abd69d0",
+                    "leftValue": "={{ $json.intencion }}",
+                    "rightValue": "ESTADO_PEDIDO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "estado"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2869e769-fa0b-4c85-ae74-fba8142dbd5d",
+                    "leftValue": "={{ $json.intencion }}",
+                    "rightValue": "DEVOLUCION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "devolucion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a68ab066-c6b3-43a5-b49f-5ca16e595e60",
+                    "leftValue": "={{ $json.intencion }}",
+                    "rightValue": "ESCALAMIENTO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalamiento"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1309184d-b307-45ed-b92f-34789c7f2afe",
+                    "leftValue": "={{ $json.intencion }}",
+                    "rightValue": "FUERA_DE_ALCANCE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fuera_alcance"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        256
+      ],
+      "id": "434e007d-faa8-4520-b01c-0e49fbbb3ca7",
+      "name": "router_intencion"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac004c19-f94e-4111-ad09-0811350eda95",
+              "name": "motivo_escalamiento",
+              "value": "={{ $json.intencion }}",
+              "type": "string"
+            },
+            {
+              "id": "dbf3dc02-6ff7-4927-9754-155e31d21201",
+              "name": "resumen_consulta",
+              "value": "={{ $json.consulta_original }}",
+              "type": "string"
+            },
+            {
+              "id": "a39dfe57-d246-4e8d-a1c0-2d0562c517f2",
+              "name": "numero_pedido",
+              "value": "={{ $json.numero_pedido }}",
+              "type": "string"
+            },
+            {
+              "id": "2f81e88d-ad15-4c0f-9076-f0cab9a22f13",
+              "name": "email_cliente",
+              "value": "={{ \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        304
+      ],
+      "id": "ac60ef42-30b2-43c4-bc36-01d869a6109c",
+      "name": "set_escalamiento"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "T5otebCYFEBITbfc",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/T5otebCYFEBITbfc",
+          "cachedResultName": "worker_escalamiento_humano"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "motivo_escalamiento": "={{ $json.motivo_escalamiento }}",
+            "resumen_consulta": "={{ $json.resumen_consulta }}",
+            "numero_pedido": "={{ $json.numero_pedido }}",
+            "email_cliente": "={{ $json.email_cliente }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "motivo_escalamiento",
+              "displayName": "motivo_escalamiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "resumen_consulta",
+              "displayName": "resumen_consulta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "numero_pedido",
+              "displayName": "numero_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "email_cliente",
+              "displayName": "email_cliente",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1408,
+        304
+      ],
+      "id": "bcd70744-118e-45b0-95d1-b5886028f956",
+      "name": "ejecutar_escalamiento",
+      "retryOnFail": true,
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff35b3c7-a035-49c2-a062-c5ed562c957a",
+              "name": "numero_pedido",
+              "value": "={{ $json.numero_pedido }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        -240
+      ],
+      "id": "96d81058-8938-4426-a425-507c4ca1e7c5",
+      "name": "set_estado"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "JyPHGfrKqbULLXkP",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/JyPHGfrKqbULLXkP",
+          "cachedResultName": "worker_consulta_pedido"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "numero_pedido": "={{ $json.numero_pedido }}"
+          },
+          "matchingColumns": [
+            "numero_pedido"
+          ],
+          "schema": [
+            {
+              "id": "numero_pedido",
+              "displayName": "numero_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1392,
+        -240
+      ],
+      "id": "f6cfcc31-6eed-49e4-8fe1-d5a9066bbd14",
+      "name": "ejecutar_consulta_estado",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b25c7d84-f67d-43df-a3b3-f70996d78bc2",
+              "name": "intencion",
+              "value": "={{ \"FUERA_DE_ALCANCE\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3983851f-553d-428d-9520-63c39337b948",
+              "name": "consulta_original",
+              "value": "={{ $json.consulta_original }}",
+              "type": "string"
+            },
+            {
+              "id": "d3c01fba-47cb-4168-a406-844a15dbcd4b",
+              "name": "datos_pedido",
+              "value": "={{ \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "34346430-09d3-4194-bef9-5a0fa539f1a6",
+              "name": "resultado_evaluacion",
+              "value": "={{ \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        512
+      ],
+      "id": "93936380-8841-499f-b74f-d820610af2f1",
+      "name": "set_fuera_alcance"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dc6b4db7-405a-44ba-952b-7354412d085b",
+              "name": "numero_pedido",
+              "value": "={{ $json.numero_pedido }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        0
+      ],
+      "id": "ca0c6a0d-aa51-41d5-9962-0b8eacc2d4cc",
+      "name": "set_devolucion"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "JyPHGfrKqbULLXkP",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/JyPHGfrKqbULLXkP",
+          "cachedResultName": "worker_consulta_pedido"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "numero_pedido": "={{ $json.numero_pedido }}"
+          },
+          "matchingColumns": [
+            "numero_pedido"
+          ],
+          "schema": [
+            {
+              "id": "numero_pedido",
+              "displayName": "numero_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1408,
+        0
+      ],
+      "id": "6834817a-0fab-473e-b727-845c86eab7ec",
+      "name": "ejecutar_consulta_devolucion",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4d234db2-2069-4673-8433-b24fa4bcbfbe",
+              "name": "fecha_entrega",
+              "value": "={{ $json.data ? $json.data.fecha_entrega : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "7de750f5-3fc7-4bdc-b775-5abc0e438cd9",
+              "name": "dias_devolucion",
+              "value": "={{ $json.data ? $json.data.dias_devolucion : \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "0b521859-e522-4881-add9-8e99d345baab",
+              "name": "estado_envio",
+              "value": "={{ $json.data ? $json.data.estado_envio : \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1616,
+        -16
+      ],
+      "id": "40b8bf0c-f861-498c-b62a-c8cb467aab8f",
+      "name": "set_datos_evaluacion"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "MxglsA8Wcwf0yyoW",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/MxglsA8Wcwf0yyoW",
+          "cachedResultName": "worker_evaluacion_devolucion"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fecha_entrega": "={{ $json.fecha_entrega }}",
+            "dias_devolucion": "={{ $json.dias_devolucion }}",
+            "estado_envio": "={{ $json.estado_envio }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "fecha_entrega",
+              "displayName": "fecha_entrega",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "dias_devolucion",
+              "displayName": "dias_devolucion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "estado_envio",
+              "displayName": "estado_envio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1824,
+        -16
+      ],
+      "id": "d9e1d29a-6b9a-4a3c-b8af-3d8d579dbdc9",
+      "name": "ejecutar_evaluacion",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d79bf6f-6627-43a1-9866-a59cb3b36f42",
+              "name": "intencion",
+              "value": "={{ \"DEVOLUCION\" }}",
+              "type": "string"
+            },
+            {
+              "id": "292bbaf2-3ea4-4611-87c6-a6ce28011758",
+              "name": "consulta_original",
+              "value": "={{ $('parsear_intencion').item.json.consulta_original }}",
+              "type": "string"
+            },
+            {
+              "id": "3d479114-da8d-4909-a48b-c3731e2a8446",
+              "name": "datos_pedido",
+              "value": "={{ JSON.stringify($('ejecutar_consulta_devolucion').item.json.data || {}) }}",
+              "type": "string"
+            },
+            {
+              "id": "df70bde8-571e-4adc-a0c2-488f09c219b4",
+              "name": "resultado_evaluacion",
+              "value": "={{ JSON.stringify($json.data || {}) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2096,
+        -32
+      ],
+      "id": "1f3913b1-6ce6-4ebd-98bb-8c11604808c9",
+      "name": "set_contexto_devolucion"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2c374882-81a7-456a-abeb-b8e877b56054",
+              "name": "intencion",
+              "value": "={{ \"ESTADO_PEDIDO\" }}",
+              "type": "string"
+            },
+            {
+              "id": "64758ff1-06c0-4d6a-856d-258f17285602",
+              "name": "consulta_original",
+              "value": "={{ $('parsear_intencion').item.json.consulta_original }}",
+              "type": "string"
+            },
+            {
+              "id": "92da5fe6-6a78-4749-a5fb-96e5588178e1",
+              "name": "datos_pedido",
+              "value": "={{ JSON.stringify($json.data || {}) }}",
+              "type": "string"
+            },
+            {
+              "id": "59ba3fcb-3f3b-4609-a796-d3cafb92bdf1",
+              "name": "resultado_evaluacion",
+              "value": "={{ \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        -240
+      ],
+      "id": "a635beac-0e3f-4748-ace9-59a68ee7a8d0",
+      "name": "set_contexto_estado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2c374882-81a7-456a-abeb-b8e877b56054",
+              "name": "intencion",
+              "value": "={{ \"ESTADO_PEDIDO\" }}",
+              "type": "string"
+            },
+            {
+              "id": "64758ff1-06c0-4d6a-856d-258f17285602",
+              "name": "consulta_original",
+              "value": "={{ $('parsear_intencion').item.json.consulta_original }}",
+              "type": "string"
+            },
+            {
+              "id": "92da5fe6-6a78-4749-a5fb-96e5588178e1",
+              "name": "datos_pedido",
+              "value": "={{ JSON.stringify($json.data || {}) }}",
+              "type": "string"
+            },
+            {
+              "id": "59ba3fcb-3f3b-4609-a796-d3cafb92bdf1",
+              "name": "resultado_evaluacion",
+              "value": "={{ \"\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1696,
+        288
+      ],
+      "id": "4ef81691-72a1-4af7-b05c-192f35b29f73",
+      "name": "set_contexto_escalamiento"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "vFlmwhB7Iedjobys",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/vFlmwhB7Iedjobys",
+          "cachedResultName": "worker_redaccion_respuesta"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "intencion": "={{ $json.intencion }}",
+            "consulta_original": "={{ $json.consulta_original }}",
+            "datos_pedido": "={{ $json.datos_pedido }}",
+            "resultado_evaluacion": "={{ $json.resultado_evaluacion }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "intencion",
+              "displayName": "intencion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "consulta_original",
+              "displayName": "consulta_original",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "datos_pedido",
+              "displayName": "datos_pedido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "resultado_evaluacion",
+              "displayName": "resultado_evaluacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2352,
+        512
+      ],
+      "id": "dd183c9b-9cc4-4e65-b937-7ec67702b8cc",
+      "name": "ejecutar_redaccion",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "aheiz.sanchez@gmail.com",
+        "subject": "=[Manager Postventa] {{ $('parsear_intencion').item.json.intencion }} - Ejecución {{ $execution.id }}",
+        "emailType": "text",
+        "message": "=REPORTE DE TRAZABILIDAD MULTI-AGENTE\nWorkflow: {{ $workflow.name }}\nID de ejecución: {{ $execution.id }}\nFecha y hora: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n\n--- CONSULTA DEL CLIENTE ---\n{{ $('parsear_intencion').item.json.consulta_original }}\n\n--- CLASIFICACIÓN DEL MANAGER ---\nIntención detectada: {{ $('parsear_intencion').item.json.intencion }}\nNúmero de pedido extraído: {{ $('parsear_intencion').item.json.numero_pedido }}\n\n--- WORKER INVOCADO ---\nWorker: {{ $json.worker }}\nEstado de la respuesta: {{ $json.status }}\nMotivo de error: {{ $json.motivo }}\n\n--- PARÁMETROS ENVIADOS AL WORKER ---\n{{ JSON.stringify($('ejecutar_redaccion').first().json) }}\n\n--- RESPUESTA DEVUELTA AL CLIENTE ---\n{{ $json.data ? $json.data.mensaje_cliente : \"Sin respuesta\" }}\n\n--- ESTADO ---\nTarea completada.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2656,
+        496
+      ],
+      "id": "d220a515-c49f-4d61-9a92-5679b0dca9aa",
+      "name": "log_trazabilidad",
+      "webhookId": "3f11bac3-a80e-4fde-a732-5ebdc26d1736",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "67Y3d8xoDsq3gA6j",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "agente_triaje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "agente_triaje",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agente_triaje": {
+      "main": [
+        [
+          {
+            "node": "parsear_intencion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parsear_intencion": {
+      "main": [
+        [
+          {
+            "node": "router_intencion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "router_intencion": {
+      "main": [
+        [
+          {
+            "node": "set_estado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set_devolucion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set_escalamiento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set_fuera_alcance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set_fuera_alcance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_escalamiento": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_escalamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_estado": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_consulta_estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_devolucion": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_consulta_devolucion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar_consulta_devolucion": {
+      "main": [
+        [
+          {
+            "node": "set_datos_evaluacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_datos_evaluacion": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_evaluacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar_evaluacion": {
+      "main": [
+        [
+          {
+            "node": "set_contexto_devolucion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar_consulta_estado": {
+      "main": [
+        [
+          {
+            "node": "set_contexto_estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar_escalamiento": {
+      "main": [
+        [
+          {
+            "node": "set_contexto_escalamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_contexto_escalamiento": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_redaccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_fuera_alcance": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_redaccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_contexto_devolucion": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_redaccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_contexto_estado": {
+      "main": [
+        [
+          {
+            "node": "ejecutar_redaccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ejecutar_redaccion": {
+      "main": [
+        [
+          {
+            "node": "log_trazabilidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d2728b2d-62cf-478d-81de-0ef2babbe82a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "49p06PvwJfl0xPo8",
+  "tags": [
+    {
+      "updatedAt": "2026-06-04T20:24:06.655Z",
+      "createdAt": "2026-06-04T20:24:06.655Z",
+      "id": "jJhBl9tZlTYQFtVZ",
+      "name": "AI Automation"
+    }
+  ]
+}
