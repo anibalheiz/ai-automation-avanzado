@@ -1,0 +1,119 @@
+{
+  "name": "worker_evaluacion_devolucion",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "fecha_entrega"
+            },
+            {
+              "name": "dias_devolucion"
+            },
+            {
+              "name": "estado_envio"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ba397084-1475-4c23-b65c-4052af7d302d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst fechaEntrega = input.fecha_entrega;\nconst diasPlazo = parseInt(input.dias_devolucion);\nconst estado = (input.estado_envio || '').toLowerCase();\n\nif (estado.includes('cancelado')) {\n  return [{\n    json: {\n      status: 'success',\n      worker: 'evaluacion_devolucion',\n      motivo: null,\n      data: {\n        procede: false,\n        dias_transcurridos: null,\n        dias_restantes: null,\n        fundamento: 'El pedido figura como cancelado y no admite devolucion.'\n      }\n    }\n  }];\n}\n\nif (!fechaEntrega || fechaEntrega.trim() === '' || isNaN(diasPlazo)) {\n  return [{\n    json: {\n      status: 'error',\n      worker: 'evaluacion_devolucion',\n      motivo: 'datos_insuficientes',\n      data: null\n    }\n  }];\n}\n\nconst hoy = new Date();\nconst entrega = new Date(fechaEntrega);\nconst transcurridos = Math.floor((hoy - entrega) / 86400000);\nconst restantes = diasPlazo - transcurridos;\nconst procede = restantes >= 0;\n\nreturn [{\n  json: {\n    status: 'success',\n    worker: 'evaluacion_devolucion',\n    motivo: null,\n    data: {\n      procede: procede,\n      dias_transcurridos: transcurridos,\n      dias_restantes: procede ? restantes : 0,\n      fundamento: procede\n        ? `Entregado hace ${transcurridos} dias. Quedan ${restantes} dias de los ${diasPlazo} del plazo.`\n        : `Entregado hace ${transcurridos} dias. El plazo de ${diasPlazo} dias vencio hace ${Math.abs(restantes)} dias.`\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5e883234-abd6-49f1-a036-74ccacac4c5f",
+      "name": "calcular_plazo",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"error\",\n  \"worker\": \"evaluacion_devolucion\",\n  \"motivo\": \"error_sistema\",\n  \"data\": null\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        144
+      ],
+      "id": "32d5b59e-1a8a-401f-9523-300a1d39032a",
+      "name": "salida_error_sistema"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        -128
+      ],
+      "id": "7a45d995-93e2-4155-9f70-8d6a3566c870",
+      "name": "salida_contrato"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "calcular_plazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calcular_plazo": {
+      "main": [
+        [
+          {
+            "node": "salida_contrato",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_error_sistema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8a238248-c7f9-4696-8a3c-822b09729019",
+  "meta": {
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "MxglsA8Wcwf0yyoW",
+  "tags": []
+}
