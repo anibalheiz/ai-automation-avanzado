@@ -1,0 +1,207 @@
+{
+  "name": "worker_consulta_pedido",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ccbe759e-fb35-4844-be16-b1f2063d4a44",
+              "leftValue": "={{ $json.numero_pedido }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        -256
+      ],
+      "id": "676e2ff1-1db0-4372-982a-d60f618c600b",
+      "name": "pedido_encontrado"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"success\",\n  \"worker\": \"consulta_pedido\",\n  \"motivo\": null,\n  \"data\": {\n    \"numero_pedido\": \"{{ $json.numero_pedido }}\",\n    \"producto\": \"{{ $json.producto }}\",\n    \"email_cliente\": \"{{ $json.email_cliente }}\",\n    \"estado_envio\": \"{{ $json.estado_envio }}\",\n    \"fecha_entrega\": \"{{ $json.fecha_entrega }}\",\n    \"transportista\": \"{{ $json.transportista }}\",\n    \"dias_devolucion\": \"{{ $json.dias_devolucion }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -272
+      ],
+      "id": "dd811a9e-7409-4d8a-82cc-7f40f99e630a",
+      "name": "salida_exito"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"error\",\n  \"worker\": \"consulta_pedido\",\n  \"motivo\": \"pedido_no_encontrado\",\n  \"data\": null\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -64
+      ],
+      "id": "251b9337-594d-4ec0-8413-7d85f9493818",
+      "name": "salida_no_encontrado"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"error\",\n  \"worker\": \"consulta_pedido\",\n  \"motivo\": \"error_sistema\",\n  \"data\": null\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        208
+      ],
+      "id": "a3455e95-3634-4c32-98a5-5d5aee2c91fb",
+      "name": "salida_error_sistema"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "numero_pedido"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "20c7de36-91c4-4c91-ac66-a728e7324422",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1TCwA4Eywguic-eNTirvSoSrgbvMfZzKg8Ep-H21CPqg/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Pedidos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1TCwA4Eywguic-eNTirvSoSrgbvMfZzKg8Ep-H21CPqg/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "numero_pedido",
+              "lookupValue": "={{ $json.numero_pedido }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "6d9709d8-3034-473d-9fc5-ac14baf6a37d",
+      "name": "buscar_pedido",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "IwagRaKrHqEBpNAw",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "pedido_encontrado": {
+      "main": [
+        [
+          {
+            "node": "salida_exito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_no_encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "buscar_pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_pedido": {
+      "main": [
+        [
+          {
+            "node": "pedido_encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_error_sistema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "45413c05-e842-4599-a8a4-99f553c21e19",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "JyPHGfrKqbULLXkP",
+  "tags": []
+}
