@@ -1,0 +1,153 @@
+{
+  "name": "worker_redaccion_respuesta",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "intencion"
+            },
+            {
+              "name": "consulta_original"
+            },
+            {
+              "name": "datos_pedido"
+            },
+            {
+              "name": "resultado_evaluacion"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        0
+      ],
+      "id": "5e8429c9-4f37-4b6d-8aa2-1f9ea16a88d1",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres el Asistente de Postventa de una tienda de comercio electronico.\nRedacta la respuesta que leera el cliente.\n\nLa fecha de hoy es {{ $now.format('yyyy-MM-dd') }}.\n\nINTENCION DETECTADA: {{ $json.intencion }}\n\nCONSULTA ORIGINAL DEL CLIENTE:\n{{ $json.consulta_original }}\n\nDATOS DEL PEDIDO (vacio si no aplica):\n{{ $json.datos_pedido }}\n\nRESULTADO DE LA EVALUACION DE DEVOLUCION (vacio si no aplica):\n{{ $json.resultado_evaluacion }}\n\nREGLAS:\n- Usa unicamente la informacion provista arriba. No inventes estados,\n  fechas, transportistas ni plazos.\n- Si un bloque llega vacio, ignoralo. No menciones que falta informacion\n  ni que hubo un error tecnico.\n- Si la evaluacion indica que la devolucion no procede, comunicalo con\n  claridad y explica el motivo con los dias indicados.\n- Nunca autorices reembolsos, descuentos ni cancelaciones. No prometas\n  fechas distintas a las registradas.\n- Si la intencion es ESCALAMIENTO, informa que el caso fue derivado a un\n  asesor humano que lo contactara, sin dar detalles internos ni numero\n  de ticket.\n- Si la intencion es FUERA_DE_ALCANCE, indica con cortesia que solo\n  atiendes consultas de postventa.\n\nFORMATO:\n- Espanol neutro, trato de usted, maximo 120 palabras.\n- Sin emojis. Sin lenguaje inclusivo con terminaciones en \"e\", \"x\" o \"@\".\n- Usa vinetas solo para enumerar datos del pedido.\n- Devuelve unicamente el mensaje para el cliente, sin encabezados ni firmas.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        208,
+        0
+      ],
+      "id": "aa808c75-44f4-45cf-8ef8-2f7ac69e1469",
+      "name": "redactar_respuesta",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        192
+      ],
+      "id": "f9f47aac-562a-4e4b-91bc-c121f4abd985",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gNlmXjyIqt7GVGRk",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"status\": \"success\",\n  \"worker\": \"redaccion_respuesta\",\n  \"motivo\": null,\n  \"data\": {\n    \"mensaje_cliente\": \"{{ $json.text }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        -128
+      ],
+      "id": "05e02537-6c8c-41fc-aeaf-d5e4bbf929f8",
+      "name": "salida_exito"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"status\": \"error\",\n  \"worker\": \"redaccion_respuesta\",\n  \"motivo\": \"fallo_modelo\",\n  \"data\": {\n    \"mensaje_cliente\": \"Estamos procesando su consulta. Un asesor le respondera a la brevedad.\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        128
+      ],
+      "id": "298df31c-45d9-4cb5-94d7-7b583e51d33e",
+      "name": "salida_error_modelo"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "redactar_respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "redactar_respuesta",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "redactar_respuesta": {
+      "main": [
+        [
+          {
+            "node": "salida_exito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "salida_error_modelo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a35d328e-75d4-471a-af08-5c9b7cc45ec5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e0ec97fb4ab1df4de48deb6447f420aa527a8b1bfc0b1ffb548c66b16a807199"
+  },
+  "id": "vFlmwhB7Iedjobys",
+  "tags": []
+}
